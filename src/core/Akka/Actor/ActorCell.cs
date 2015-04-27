@@ -30,6 +30,7 @@ namespace Akka.Actor
         private bool _actorHasBeenCleared;
         private Mailbox _mailbox;
         private readonly ActorSystemImpl _systemImpl;
+	    private readonly ActorCellSynchronizationContext _syncContext;
 
 
         public ActorCell(ActorSystemImpl system, IInternalActorRef self, Props props, MessageDispatcher dispatcher, IInternalActorRef parent)
@@ -39,7 +40,7 @@ namespace Akka.Actor
             _systemImpl = system;
             Parent = parent;
             Dispatcher = dispatcher;
-            
+			_syncContext = new ActorCellSynchronizationContext(this);
         }
 
         public object CurrentMessage { get; private set; }
@@ -235,6 +236,10 @@ namespace Akka.Actor
         {
             var tmp = InternalCurrentActorCellKeeper.Current;
             InternalCurrentActorCellKeeper.Current = this;
+
+	        var oldSyncContext = SynchronizationContext.Current;
+	        _syncContext.SetParent(oldSyncContext);
+			SynchronizationContext.SetSynchronizationContext(_syncContext);
             try
             {
                 action();
@@ -243,6 +248,7 @@ namespace Akka.Actor
             {
                 //ensure we set back the old context
                 InternalCurrentActorCellKeeper.Current = tmp;
+				SynchronizationContext.SetSynchronizationContext(oldSyncContext);
             }
         }
 
